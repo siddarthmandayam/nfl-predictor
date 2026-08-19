@@ -4,3 +4,4 @@ data/raw/
 *.parquet
 .DS_Store
 .ipynb_checkpoints/
+reports/
