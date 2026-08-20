@@ -199,9 +199,6 @@ def main():
     calibration_plot(ym, {"market": mk.p.values,
                           "base rate": np.full(len(ym), ym.mean())})
 
-    print("\nThe market row is the bar. Beating its log loss out-of-sample "
-          "would be a real result;\nmatching it is already respectable.")
-
 
 if __name__ == "__main__":
     main()
