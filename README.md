@@ -6,12 +6,6 @@ Baselines
 
 Every result is measured against these. Regular season, ties excluded.
 
-| Baseline |	Games |	Accuracy |	Log Loss |
-| Coin flip (0.500) |	6,208 |	43.89% |	0.6931 |
-| Base rate (0.561) |	6,208 |	56.11% |	0.6857 |
-| Always pick Vegas favorite |	6,208 |	66.70% |	— |
-| Market probability (de-vigged moneyline, 2006–2025) |	5,051 |	66.52% |	0.6086 |
-
 
 | Baseline | Games | Accuracy | Log Loss |
 | :--- | :---: | :---: | :---: |
@@ -38,10 +32,18 @@ ATS (against the spread) performance will be tracked separately. Break-even at s
 
 Setup
 
-python3 -m venv .venv && source .venv/bin/activate
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-python src/build_game_table.py    # builds the game table, prints baselines
-python src/evaluate.py            # scores baselines, writes calibration plot
+
+# Builds the game table, prints baselines
+python src/build_game_table.py
+
+# Scores baselines, writes calibration plot
+python src/evaluate.py
+```
+
 
 build_game_table.py writes data/processed/games.parquet (played games with the target) and upcoming.parquet (the 2026 schedule). Both scripts run their own assertions; if one fires, the upstream data changed and the pipeline should not be trusted until it is resolved.
 
