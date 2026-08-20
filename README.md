@@ -6,11 +6,11 @@ Baselines
 
 Every result is measured against these. Regular season, ties excluded.
 
-Baseline	Games	Accuracy	Log loss
-Coin flip (0.500)	6,208	43.89%*	0.6931
-Base rate (0.561)	6,208	56.11%	0.6857
-Always pick Vegas favorite	6,208	66.70%	—
-Market probability (de-vigged moneyline, 2006–2025)	5,051	66.52%	0.6086
+| Baseline |	Games |	Accuracy |	Log Loss |
+| Coin flip (0.500) |	6,208 |	43.89% |	0.6931 |
+| Base rate (0.561) |	6,208 |	56.11% |	0.6857 |
+| Always pick Vegas favorite |	6,208 |	66.70% |	— |
+| Market probability (de-vigged moneyline, 2006–2025) |	5,051 |	66.52% |	0.6086 |
 
 Home teams have won 56.11% of the previous 6208 games played in the previous 2002-2025 NFL regular seasons.
 My model outputs a probability that the home team wins and determines whether to pick the home team if greater than 50% in evaluate.py line 40:
