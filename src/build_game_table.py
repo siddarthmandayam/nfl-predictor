@@ -1,11 +1,10 @@
 """
-build_game_table.py  --  Phase 1
+build_game_table.py
 
-Builds the one-row-per-game table that every later phase depends on.
-Everything downstream joins to this, so it needs to be boring and correct.
+Builds the one row per game table
 
 Outputs:
-    data/processed/games.parquet     played regular-season games (has target)
+    data/processed/games.parquet     played regular season games (has target)
     data/processed/upcoming.parquet  scheduled games not yet played
 
 Run:
@@ -20,11 +19,11 @@ import sys
 
 import pandas as pd
 
-# nflverse maintains this file; it updates through the season.
+# nflverse maintains this file and updates through the season
 SCHEDULE_URL = "https://github.com/nflverse/nfldata/raw/master/data/games.csv"
 
 # 2002 is the first season with the current 32-team / 8-division alignment,
-# which keeps scheduling structure consistent. Widen later if you want.
+# which keeps scheduling structure consistent
 FIRST_SEASON = 2002
 
 OUT_DIR = Path("data/processed")
@@ -33,8 +32,7 @@ OUT_DIR = Path("data/processed")
 # the only three that ever change. nflverse uses LA (not LAR) and JAX (not JAC).
 TEAM_FIXES = {"OAK": "LV", "SD": "LAC", "STL": "LA"}
 
-# Columns worth carrying forward. Vegas lines and rest days are already here,
-# so you get your strongest baseline for free.
+# Columns worth carrying forward. Vegas lines and rest days are already here.
 KEEP = [
     "game_id", "season", "week", "gameday", "game_type",
     "home_team", "away_team", "home_score", "away_score", "result",
@@ -91,7 +89,7 @@ def sanity_checks(played: pd.DataFrame):
     assert played.home_win.notna().all(), "null target"
     assert (played.home_team != played.away_team).all(), "team playing itself"
 
-    # A team should appear at most once per season-week.
+    # A team should appear at most once per week
     long = pd.concat([
         played[["season", "week", "home_team"]].rename(columns={"home_team": "team"}),
         played[["season", "week", "away_team"]].rename(columns={"away_team": "team"}),

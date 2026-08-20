@@ -1,6 +1,5 @@
 """
-evaluate.py  --  Phase 2
-
+evaluate.py
 Scoring for probabilistic predictions. Written before any model exists, so no
 metric here was chosen after seeing a model's results.
 
