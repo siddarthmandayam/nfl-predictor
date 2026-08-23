@@ -5,7 +5,7 @@ import pandas as pd
 URL = ("https://github.com/nflverse/nflverse-data/releases/download/pbp/"
        "play_by_play_{season}.parquet")
 
-SEASONS = list(range(2022, 2025))   # start small, can backfill once this is trusted
+SEASONS = list(range(2002, 2026))
 
 RAW = Path("data/raw")
 OUT = Path("data/processed/team_games.parquet")
@@ -40,7 +40,7 @@ def team_game_stats(df: pd.DataFrame, include_playoffs=True) -> pd.DataFrame:
         & df.posteam.notna()      # posteam is null on timeouts and end-of-period rows
         & df.defteam.notna()
     ]
-    
+
     if not include_playoffs:
         d = d[d.season_type == "REG"]
 

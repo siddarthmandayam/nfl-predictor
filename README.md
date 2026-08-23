@@ -1,6 +1,9 @@
 # 2026 NFL Weekly Game Predictor
 
-A probabilistic model for predicting weekly game outcomes for the 2026 NFL regular season, evaluated against real baselines and logged live before kickoff each week. Trained on previous 2002–2025 regular seasons. Live predictions begin Week 1 of the 2026 season.
+A probabilistic model for predicting weekly game outcomes for the 2026 NFL regular
+season, evaluated against real baselines and logged live before kickoff each week.
+Will be trained on the 2002–2025 regular seasons. Live predictions begin Week 1 of
+the 2026 season.
 
 ## Baselines
 
@@ -16,7 +19,7 @@ Every result is measured against these. Regular season, ties excluded.
 
 
 Home teams have won 56.11% of the previous 6208 games played in the previous 2002-2025 NFL regular seasons.
-Predictions are probabilities that the home team wins; evaluate.py converts them to picks with a 0.5 threshold and determines whether to pick the home team if greater than 0.5 in evaluate.py:
+Predictions are probabilities that the home team wins; `evaluate.py` converts them to picks with a 0.5 threshold:
 `acc = ((p > 0.5) == (y_true == 1)).mean()`
 Therefore, a constant 0.5 coin flip never clears the 0.5 decision threshold and picks the away team every game resulting in a 0.4389 baseline accuracy.
 
@@ -65,10 +68,34 @@ nflverse — free, public, play-by-play data back to 1999. Schedules are read di
 The nfl_data_py wrapper is deliberately not used: as of v0.3.3 it pins pandas<2.0 and numpy<2.0, which will not build on current Python. Reading the source files directly removes the dependency.
 
 Handling decisions, all verified against the data rather than assumed:
-Team abbreviations normalized to current (OAK→LV, SD→LAC, STL→LA). These are the only three that change; nflverse uses LA and JAX.
-spread_line is positive when the home team is favored. Confirmed by asserting home win rate rises monotonically across it (18.6% at ≤ −10, up to 87.7% at > +10).
-15 tied games dropped (0.2%). A binary classifier has nowhere to put them.
-Seasons before 2002 excluded to keep divisional alignment consistent.
-Moneylines are unavailable before 2006, so the market baseline runs on 5,051 of the 6,208 games.
+- Team abbreviations normalized to current (OAK→LV, SD→LAC, STL→LA). These are the only three that change; nflverse uses LA and JAX.
+- spread_line is positive when the home team is favored. Confirmed by asserting home win rate rises monotonically across it (18.6% at ≤ −10, up to 87.7% at > +10).
+- 15 tied games dropped (0.2%). A binary classifier has nowhere to put them.
+- Seasons before 2002 excluded to keep divisional alignment consistent.
+- Moneylines are unavailable before 2006, so the market baseline runs on 5,051 of the 6,208 games.
 
 Play-by-play files include playoffs (13 games/season) and are aggregated to one row per team per game. 2022 has 271 regular-season games rather than 272: the Bills–Bengals game was cancelled after Damar Hamlin's cardiac arrest and never replayed. Both facts are flagged and under test rather than absorbed into a row count.
+
+## Features
+
+Team strength is measured as EPA per play (expected points added), aggregated from play-by-play to one row per team per game, then averaged over each team's previous 5 games. Offensive and defensive EPA are computed separately by grouping the same plays by `posteam` and by `defteam` — so `def_epa` is EPA *allowed*, where lower is better.
+
+Correctness is enforced by a conservation identity: league-wide mean `off_epa` must equal league-wide mean `def_epa`, since every offensive play is some defense's play. It holds to nine decimal places (−0.014295 across 12,998 team-games, 2002–2025).
+
+**Leakage guard.** A rolling mean includes the current game unless it is shifted. `features.py` shifts by one game before rolling, and `test_no_leakage()` proves it: for a chosen team and mid-season week, it recomputes the feature by hand from strictly earlier games and asserts a match, then asserts the value is *inconsistent* with a window that includes the current game. For example, Baltimore's Week 10 2024 feature is built from weeks 5–9.
+
+Rolling windows reset at each season boundary because rosters and schemes turn over heavily in the offseason. This costs 18.7% of games to warm-up (1,158 of 6,208, the first three weeks of every season) and is one of the variants to be tested later.
+
+## Validation
+
+**Leakage.** Every feature is a rolling window shifted so it contains only
+information available before kickoff. Enforced by `test_no_leakage()`, which runs
+on every feature build. See the Features section above.
+
+**Temporal cross-validation.** Random k-fold trains on the future. Validation is
+walk-forward: train through season *N*, test on *N+1*, roll forward, then pool the
+out-of-sample predictions and score once.
+
+The market probability is used strictly as a comparison and is never a model
+feature. Including it would dominate every other input and produce an expensive
+line-copier.
