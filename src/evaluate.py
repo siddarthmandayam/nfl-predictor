@@ -1,22 +1,3 @@
-"""
-evaluate.py
-Scoring for probabilistic predictions. Written before any model exists, so no
-metric here was chosen after seeing a model's results.
-
-Four numbers, and they answer different questions:
-
-  accuracy  did the pick win? Ignores confidence entirely. Least informative.
-  log loss  how good were the probabilities? Punishes confident mistakes hard.
-            This is the primary metric.
-  Brier     mean squared error on probabilities. Gentler than log loss on
-            confident mistakes; reported as a sanity companion.
-  ECE       expected calibration error. When you say 70%, do you win 70%?
-            A model can have good log loss and still be miscalibrated.
-
-Run directly to score the baselines:
-    python src/evaluate.py
-"""
-
 from pathlib import Path
 
 import numpy as np

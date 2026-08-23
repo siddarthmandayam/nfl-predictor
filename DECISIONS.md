@@ -1,5 +1,52 @@
 Running record of what I tried, what happened, and lessons learned.
 
+08-21-26: team-game aggregation
+
+Built `src/build_team_games.py`. Downloads and caches nflverse
+play-by-play for 2022–2024, filters to scrimmage plays, aggregates to one row per
+team per game with offensive and defensive EPA. No rolling yet.
+
+**Found:**
+
+- **1,708 rows / 854 games, not the 816 expected** from 3 × 272. Two causes, both
+  real: play-by-play includes playoffs (39 games over three seasons), and 2022 had
+  only 271 regular-season games since the Bills–Bengals game was cancelled after Damar Hamlin's cardiac arrest and never made up.
+- My sanity checks passed anyway. They verify internal consistency (2 rows per
+  game, conservation, plausible play counts) but cannot verify that I loaded the
+  data I intended to load. Worth remembering: assertions catch corruption, not
+  wrong assumptions.
+- **Conservation check holds exactly:** mean off_epa = mean def_epa = −0.010733.
+  Every offensive play is some defense's play, so these are the same numbers in a
+  different order. This is the check that actually proves the double-groupby and
+  merge are correct.
+- 2024 leaders come out BAL 0.224 / BUF 0.191 / DET 0.166 on offense, PHI −0.116 /
+  DEN −0.101 / MIN −0.086 on defense. Matches reality, so the grouping is right.
+- Mean 62.1 scrimmage plays per team-game, range 33–95.
+
+**Decided:**
+
+- **Filter to `pass` and `run` plays only.** Punts, kickoffs and field goals carry
+  extreme EPA values that swamp the signal.
+- **`def_epa` is EPA allowed, so lower is better** — the opposite direction from
+  `off_epa`. Noted explicitly because it's a sign error waiting to happen in the
+  rolling features.
+- **Drop rows where `posteam` or `defteam` is null** (timeouts, end-of-period
+  markers) to avoid a phantom team appearing in the groupby.
+- **Playoff games: [KEEP / DROP — decide and justify].** Not a leakage question —
+  a January game precedes the following September, so including it in a Week 1
+  feature uses only past information. The real tradeoff: playoff games are recent
+  evidence of team strength, but they're a biased sample of teams and the target
+  is regular-season only.
+- **Start with three seasons** for iteration speed; backfill to 2002 once the
+  rolling features are validated.
+
+**Next:** rolling features. Sort by team and date, take a rolling mean over the
+previous N games, `.shift(1)` so the current game is excluded, then join twice onto
+`games.parquet` as home and away. Write the leakage test first: select a mid-season
+game, assert every feature value uses only data from strictly earlier weeks.
+
+Also going to test both with playoffs and without playoffs. While playoffs is more data, the concern is that the playoffs usually consists of the best teams in the NFL. As a result, I suspect games will be tougher and EPA for teams will be lower against good competition. Therefore, using playoff data may result in good teams being penalized which could lead to bias.
+
 08-19-2026: evaluate.py
 
 Built src/evaluate.py. Reusable scoring functions (accuracy, log loss, Brier, ECE), calibration tables and plots, and moneyline-to-probability conversion. Written before any model exists, so no metric was selected after seeing results. Verified on my own machine; output matches expectations exactly.
