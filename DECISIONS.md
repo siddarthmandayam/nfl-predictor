@@ -1,5 +1,61 @@
 Running record of what I tried, what happened, and lessons learned.
 
+## 2026-08-23: walk-forward logistic regression
+
+**Did:** Built `src/model.py`. Scaler + logistic regression in a pipeline, fit separately for each test season on all prior seasons only, predictions pooled and scored once against the market on identical games. 3,397 out-of-sample games, 2010–2025.
+
+The validation scheme is the point of this file, not the model. For each test season, the model is fit only on seasons strictly before it, then predicts that season. Predictions are pooled and scored once at the end, so every number reported is out-of-sample.
+
+Three things this file is careful about, because each silently inflates results:
+  1. The scaler is fit inside the pipeline, on training data only. Fitting it on
+     everything leaks the test distribution into training.
+  2. The market is scored on exactly the same rows as the model. Different row
+     sets make the comparison meaningless.
+  3. Nothing is refit after seeing test scores.
+
+**Found:**
+
+- **Model: 63.03% accuracy, 0.6405 log loss, 0.2247 Brier, ECE 0.0301.**
+  Market: 0.6033. Base rate: 0.6879.
+- The model reduces log loss 6.9% below the base rate; the market reduces it 12.3%.
+  Rolling EPA alone captures roughly **56% of the market's edge**. It does not beat
+  the market and was not expected to — a first-pass model that appeared to would be
+  evidence of leakage, not skill.
+- **All seven coefficient signs are correct.** `epa_edge_off` +0.305 (strongest),
+  `home_off_epa_r5` +0.217 vs `away_off_epa_r5` −0.212 (near-symmetric, as they
+  should be), `home_def_epa_r5` −0.142 (allowing more EPA lowers win probability —
+  the inverted sign I flagged in Phase 3, confirmed correct), `epa_edge_def` +0.138,
+  `rest_edge` +0.062, `away_def_epa_r5` +0.050. This is the main argument for
+  starting linear: a backwards feature would have been visible immediately.
+- **The model is overconfident in the middle of its range.** Gaps of −0.02 to −0.04
+  across the 0.4–0.7 bins; when it says 65%, home teams win 62%. Same direction as
+  the market's miscalibration but larger (ECE 0.0301 vs 0.0191).
+- **Noise floor is large.** Per-season log loss ranges 0.5957 (2012) to 0.6699
+  (2015) — a 0.07 spread, wider than the entire gap to the market. Variant
+  comparisons must use the pooled figure across all sixteen test seasons.
+  Differences under ~0.01 on a single season are meaningless.
+- Redundant features: `epa_edge_off` is exactly `home_off_epa_r5 − away_off_epa_r5`,
+  and all three are in the model. Logistic regression handles the collinearity but
+  splits the coefficient across correlated inputs, muddying interpretation.
+
+**Decided:**
+
+- **Scaler goes inside the pipeline**, so it is fit on training rows only. Fitting
+  it on the full dataset would leak the test distribution into training.
+- **Market scored on identical rows.** Games without a moneyline are dropped from
+  both sides, not just the market's. 3,397 of 3,398 games qualify.
+- **First test season is 2010**, so the first fit trains on eight seasons rather
+  than one.
+- **Report the loss to the market plainly.** The honest finding is that rolling EPA
+  captures about half the market's edge. Framing that as a failure would be wrong,
+  and hiding it would be worse.
+- **A separate full-data fit is used only to read coefficients**, never scored. Its
+  numbers appear nowhere in the results.
+
+**Next:** the live weekly loop, before Week 1. Then the variant sweep
+(window length, min periods, season reset, playoff inclusion) and probability
+calibration, judged on pooled log loss. The playoff-inclusion question from 2026-08-21 needs this noise floor to be answerable at all — a 0.07 per-season spread means the effect of a few games in a rolling window is invisible except in the pooled figure.
+
 ## 2026-08-23 — backfill to 2002
 
 **Did:** Extended `build_team_games.py` from 3 seasons to 24 (2002–2025) and
@@ -70,7 +126,7 @@ only one usable test season, and the full range should yield roughly 5,000. Then
 
 ## 2026-08-21: team-game aggregation
 
-Built `src/build_team_games.py`. Downloads and caches nflverse play-by-play for 2022–2024, filters to scrimmage plays, aggregates to one row per team per game with offensive and defensive EPA. No rolling yet.
+Built `src/build_team_games.py`. Downloads and caches nflverse play-by-play for 2022–2024, filters to scrimmage plays, aggregates to one row per team per game with offensive and defensive EPA. No rolling yet. `src/build_game_table.py` writes data/processed/games.parquet (played games with the target) and upcoming.parquet (the 2026 schedule). Both scripts run their own assertions; if one fires, the upstream data changed and the pipeline should not be trusted until it is resolved.
 
 **Found:**
 
@@ -113,6 +169,15 @@ Also going to test both with playoffs and without playoffs. While playoffs is mo
 ## 2026-08-19: evaluate.py
 
 Built src/evaluate.py. Reusable scoring functions (accuracy, log loss, Brier, ECE), calibration tables and plots, and moneyline-to-probability conversion. Written before any model exists, so no metric was selected after seeing results. Verified on my own machine; output matches expectations exactly.
+
+Four numbers, answering different questions:
+
+| Metric | What it asks | Notes |
+| :--- | :--- | :--- |
+| **Accuracy** | Did the pick win? | Ignores confidence entirely. Least informative. |
+| **Log loss** | How good were the probabilities? | Punishes confident mistakes hard. **Primary metric.** |
+| **Brier** | Mean squared error on probabilities | Gentler than log loss on confident mistakes. Sanity companion. |
+| **ECE** | When you say 70%, do you win 70%? | A model can score well on log loss and still be miscalibrated. |
 
 Market baseline: 66.52% accuracy, 0.6086 log loss, 0.2108 Brier, ECE 0.0186 over 5,051 games. This is the number to beat.
 The achievable range is narrow. No information = 0.6931 (that's −ln(0.5)), base rate = 0.6857, market = 0.6086, perfect = 0.0000. The market is an 11.4% log loss reduction over the base rate. Most NFL variance is irreducible.

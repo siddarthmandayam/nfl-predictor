@@ -33,33 +33,68 @@ Note that the base-rate model has perfect calibration (ECE = 0.0000) and no pred
 
 ATS (against the spread) performance will be tracked separately. Break-even at standard -110 juice is 52.4%; results indistinguishable from chance will be reported as such.
 
+## Results
+
+Walk-forward validation: for each test season, the model is fit only on seasons
+strictly before it. Predictions are pooled and scored once. **3,397 games,
+2010–2025, all out-of-sample.**
+
+| Model | Accuracy | Log loss | Brier | ECE |
+| :--- | :---: | :---: | :---: | :---: |
+| Market (de-vigged moneyline) | 67.62% | **0.6033** | 0.2081 | 0.0191 |
+| **Logistic regression on rolling EPA** | **63.03%** | **0.6405** | 0.2247 | 0.0301 |
+| Base rate (0.552) | 55.20% | 0.6879 | 0.2474 | 0.0088 |
+
+The model reduces log loss 6.9% below the base rate; the market reduces it 12.3%.
+So rolling EPA alone captures roughly **56% of the market's edge** over knowing
+nothing.
+
+**Where it is weak.** The model is overconfident in the middle of its range. Shows gaps of −0.02 to −0.04 across the 0.4–0.7 bins, giving ECE of 0.0301 against the market's 0.0191. When it says 65%, home teams win 62%. Probability calibration is the obvious next experiment.
+
+**Noise floor.** Per-season log loss ranges from 0.5957 (2012) to 0.6699 (2015) — a spread of 0.07, wider than the entire gap to the market. Any variant comparison
+must be judged on the pooled figure across all sixteen test seasons. Differences under ~0.01 on a single season are not meaningful.
+
+**Coefficients** (standardized) point the right way on all seven features:
+`epa_edge_off` +0.305 is strongest, `home_def_epa_r5` −0.142 correctly encodes
+that allowing more EPA lowers win probability, and `home_off_epa_r5` / 
+`away_off_epa_r5` are near-symmetric at +0.217 / −0.212. Sign checking is the main
+reason to start with a linear model.
+
 ## Setup
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-
-# Builds the game table, prints baselines
-python src/build_game_table.py
-
-# Scores baselines, writes calibration plot
-python src/evaluate.py
 ```
 
+Run in order. Each stage reads what the previous one wrote.
 
-build_game_table.py writes data/processed/games.parquet (played games with the target) and upcoming.parquet (the 2026 schedule). Both scripts run their own assertions; if one fires, the upstream data changed and the pipeline should not be trusted until it is resolved.
+```bash
+# schedules -> games.parquet + upcoming.parquet; prints baselines
+python src/build_game_table.py
 
-`evaluate.py` scores probabilistic predictions. It was written before any model
-existed, so no metric was chosen after seeing a model's results. Four numbers,
-answering different questions:
+# scores baselines, writes reports/calibration.png
+python src/evaluate.py
 
-| Metric | What it asks | Notes |
-| :--- | :--- | :--- |
-| **Accuracy** | Did the pick win? | Ignores confidence entirely. Least informative. |
-| **Log loss** | How good were the probabilities? | Punishes confident mistakes hard. **Primary metric.** |
-| **Brier** | Mean squared error on probabilities | Gentler than log loss on confident mistakes. Sanity companion. |
-| **ECE** | When you say 70%, do you win 70%? | A model can score well on log loss and still be miscalibrated. |
+# play-by-play -> team_games.parquet (downloads ~24 seasons, cached)
+python src/build_team_games.py
+
+# rolling features -> features.parquet; runs the leakage test
+python src/features.py
+
+# walk-forward validation -> oos_predictions.parquet
+python src/model.py
+```
+
+Each script runs its own assertions. If one fires, the upstream data changed and
+the pipeline should not be trusted until it is resolved.
+
+**Order matters.** `features.py` reads both `team_games.parquet` and
+`games.parquet`; `model.py` reads `features.parquet`. Changing an early stage
+without re-running the later ones leaves stale intermediate files that fail
+confusingly — for example, widening the season range in `build_team_games.py`
+without re-running `features.py` leaves the model training on the old subset.
 
 ## Data
 
