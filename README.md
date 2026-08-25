@@ -2,8 +2,21 @@
 
 A probabilistic model for predicting weekly game outcomes for the 2026 NFL regular
 season, evaluated against real baselines and logged live before kickoff each week.
-Will be trained on the 2002–2025 regular seasons. Live predictions begin Week 1 of
-the 2026 season.
+Trained on the 2002–2025 regular seasons. Live predictions begin Week 1 of the
+2026 season.
+
+## Status
+
+**Complete and live.** All five phases built and validated. Predictions are logged
+weekly through the 2026 season.
+
+| Phase | Status |
+|---|---|
+| 1. Game table + validation | Done |
+| 2. Evaluation harness | Done |
+| 3. Rolling EPA features + leakage tests | Done |
+| 4. Walk-forward model | Done |
+| 5. Live weekly predictions | Live |
 
 ## Baselines
 
@@ -25,9 +38,12 @@ Therefore, a constant 0.5 coin flip never clears the 0.5 decision threshold and 
 
 Log loss is the primary metric. It is the only one of the four that punishes confident mistakes, and what the model is trained to minimize. The scale runs from 0.6931 (no information) down to 0.0000 (perfect foresight). The market reaches 0.6086 which is an 11.4% reduction against the base rate.
 
-That narrow range is the central finding so far: NFL outcomes are largely irreducible. Participants with injury reports, weather, betting flow, and significant money at stake extract only a fraction of the available signal.
+That narrow range is a central finding: NFL outcomes are largely irreducible. Participants with injury reports, weather, betting flow, and significant money at stake extract only a fraction of the available signal.
 
-Honest expectations follow from that. Matching 0.6086 out-of-sample would be a strong result; 0.62–0.64 is a reasonable target. Anything below roughly 0.58 out-of-sample is treated as evidence of leakage rather than skill, and investigated as such.
+Honest expectations followed from that, written before any model existed: matching
+0.6086 out-of-sample would be a strong result, 0.62–0.65 a reasonable target, and
+anything below roughly 0.58 evidence of leakage rather than skill. The result came
+in at 0.6448 which is inside the predicted band, and well clear of the leakage threshold.
 
 Note that the base-rate model has perfect calibration (ECE = 0.0000) and no predictive value at all — it never commits to anything. Calibration is necessary but not sufficient, which is why four metrics are reported rather than one.
 
@@ -44,6 +60,10 @@ strictly before it. Predictions are pooled and scored once. **4,161 games,
 | Market (de-vigged moneyline) | 66.57% | **0.6094** | 0.2110 | 0.0165 |
 | **Logistic regression on rolling EPA** | **62.56%** | **0.6448** | 0.2268 | 0.0222 |
 | Base rate (0.554) | 55.42% | 0.6874 | 0.2471 | 0.0070 |
+
+The market figure here (0.6094) differs from the 0.6086 in Baselines because it is
+computed on the 4,161 out-of-sample games the model predicted, not all 5,051 games
+with moneylines. Comparisons are always made on identical rows.
 
 The model reduces log loss 6.2% below the base rate; the market reduces it 11.4%.
 Rolling EPA alone captures roughly **55% of the market's edge** over knowing nothing.
@@ -65,6 +85,34 @@ single season.
 allowing more EPA lowers win probability; `home_off_epa_r5` +0.212 and
 `away_off_epa_r5` −0.185 are near-symmetric with opposite signs. Sign checking is
 the main reason to start with a linear model.
+
+## Live predictions
+
+Predictions are generated and committed **before kickoff**, then never edited. Git
+history is the audit trail, every file's commit timestamp precedes the games it
+predicts. `predict.py` refuses to overwrite an existing prediction file.
+
+Week 1 2026 was logged on 2026-08-25, fifteen days before the opening game.
+
+Each `predictions/2026_weekNN.csv` holds the generated-at UTC timestamp, both
+teams, the model's home win probability, the closing spread, and the pick.
+
+**Known weakness in early-season predictions.** Week 1 features are rolling EPA
+carried over from the end of the 2025 season. The model has no knowledge of free
+agency, the draft, retirements, or coaching changes. It treats these as the same
+teams that finished last season. Stated here before the games rather than offered
+afterward as an explanation as one of the potential weaknesses of this model.
+
+**On disagreements with the market.** The model is less confident than the closing
+line on several Week 1 games and picks against it on others. Given it scores 0.6448
+against the market's 0.6094 out-of-sample, the honest prior is that where they
+disagree, the market is more often right. Disagreement is not evidence of an edge.
+
+**Train/serve consistency.** The serving path builds features differently from the
+training path in carrying each team's current form forward to a game that hasn't
+happened, rather than attaching form to a completed game. `predict.py` asserts the
+two produce identical values on a real past game, because divergence there would
+silently feed the model inputs it was never trained on.
 
 ## Setup
 
@@ -91,6 +139,9 @@ python src/features.py
 
 # walk-forward validation -> oos_predictions.parquet
 python src/model.py
+
+# generate and log predictions for a week (refuses to overwrite)
+python src/predict.py 2026 1
 ```
 
 Each script runs its own assertions. If one fires, the upstream data changed and
@@ -143,3 +194,18 @@ out-of-sample predictions and score once.
 The market probability is used strictly as a comparison and is never a model
 feature. Including it would dominate every other input and produce an expensive
 line-copier.
+
+## Repository
+
+src/build_game_table.py schedules -> games.parquet, upcoming.parquet
+src/evaluate.py metrics, calibration, market baseline
+src/build_team_games.py play-by-play -> team-game EPA
+src/features.py rolling features + leakage test
+src/model.py walk-forward validation
+src/predict.py weekly predictions + train/serve check
+predictions/ timestamped weekly predictions (append-only)
+DECISIONS.md running log of choices, findings, and dead ends
+
+
+`predictions/` is append-only. Files are committed before games are played and
+never edited afterward.

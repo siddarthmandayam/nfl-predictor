@@ -1,5 +1,40 @@
 Running record of what I tried, what happened, and lessons learned.
 
+## 2026-08-25: live prediction loop
+
+**Did:** Built `src/predict.py`. Fits on all completed games, carries each team's
+current rolling form forward to an upcoming matchup, writes a timestamped CSV to
+`predictions/`. Generated and committed Week 1 2026 fifteen days before kickoff.
+
+**Found:**
+
+- **The serving path is not the training path.** `features.py` attaches a team's
+  form to a game that already happened; serving carries current form forward to a
+  game that hasn't. Different code, same quantity and nothing would raise an
+  error if they diverged. Added `serve_train_consistency_check()`, which recomputes
+  a real past game's features through the serving path and asserts they match what
+  training produced. Verified on PIT 2025 wk18.
+- The model disagrees with the closing line on several Week 1 games. Most notably
+  NO @ DET (market ≈70% DET, model 50.2%) and ARI @ LAC (market ≈78% LAC, model
+  62.5%). Given the model loses to the market out-of-sample, the honest prior is
+  that the market is more often right where they disagree.
+
+**Decided:**
+
+- **Refit on every run**, on every completed game available at that moment. As 2026
+  games finish they enter the training set. Stated as policy so any prediction can
+  be reproduced from the data available at its timestamp.
+- **Prediction files are immutable.** `predict.py` exits rather than overwrite an
+  existing file. Regenerating requires deleting deliberately. Git timestamps are
+  what make the track record auditable rather than a claim.
+- **Document the Week 1 blind spot before the games.** Features are 2025
+  end-of-season form; the model knows nothing of free agency, the draft, or
+  coaching changes. Naming this in advance is worth more than explaining it after.
+
+**Next:** Log predictions weekly through the season. Then the remaining variant
+sweep (window length, min periods, playoff inclusion) and probability calibration,
+judged on pooled log loss.
+
 ## 2026-08-23: season-boundary reset, tested and reversed
 
 **Did:** Tested `RESET_EACH_SEASON` both ways, rebuilt features and re-ran walk-forward validation for each.
