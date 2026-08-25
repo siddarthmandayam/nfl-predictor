@@ -1,5 +1,48 @@
 Running record of what I tried, what happened, and lessons learned.
 
+## 2026-08-23: season-boundary reset, tested and reversed
+
+**Did:** Tested `RESET_EACH_SEASON` both ways, rebuilt features and re-ran walk-forward validation for each.
+
+**Found:**
+
+| | games | model | market | gap | ECE |
+|---|---|---|---|---|---|
+| Reset each season | 3,397 | 0.6405 | 0.6033 | 0.0372 | 0.0301 |
+| Carry across seasons | 4,161 | 0.6448 | 0.6094 | 0.0354 | 0.0222 |
+
+- **The raw log losses are not comparable — different row sets.** Carrying over
+  adds 1,108 previously-dropped games, all early-season, which are harder to
+  predict. The tell is that the *market* also got worse on the larger set
+  (0.6033 → 0.6094). The games changed, not the model. This is the same error I
+  guarded against when scoring the market on identical rows, and I nearly repeated
+  it on my own experiment.
+- **Gap to market is the fair comparison**, since it normalizes for game
+  difficulty: 0.0354 carrying vs 0.0372 resetting. Slight edge to carrying, but far
+  inside the noise floor. **No detectable quality difference.**
+- Carrying over recovers 1,108 games (warm-up 18.7% → 0.8%) and improves
+  calibration (ECE 0.0222 vs 0.0301).
+- Noise floor now measured precisely: per-season log loss 0.6178 (2011) to 0.6728
+  (2021), a 0.055 spread which is wider than the 0.035 gap to the market.
+
+**Decided:**
+
+- **`RESET_EACH_SEASON = False` permanently.** My reasoning was that offseason
+  roster turnover means January form says little about September and I predicted
+  carrying over would hurt. It doesn't, at least not measurably. Hypothesis not
+  supported.
+- The decision rests on operational grounds rather than accuracy: more training
+  data, better calibration, and Week 1 becomes predictable at all.
+- **This was forced by the live loop.** Planning surfaced that weeks 1–3 of
+  2026 would have no features under season reset. Carrying over only at prediction
+  time would have created train/serve skew as the model would see a feature
+  distribution in production that never appeared in training. Consistency required
+  changing the training config, not just the serving path.
+- Fixed the warm-up print string to derive its wording from `RESET_EACH_SEASON`
+  rather than hardcoding "each season," which was silently wrong after the flip.
+
+**Next:** live weekly predictions, now unblocked for Week 1. Remaining variants (window length, min periods, playoff inclusion) still to sweep, judged on pooled log loss. The playoff question from 2026-08-21 needs this noise floor to be answerable at all: a 0.055 per-season spread means the effect of a few games inside a rolling window is invisible except in the pooled figure.
+
 ## 2026-08-23: walk-forward logistic regression
 
 **Did:** Built `src/model.py`. Scaler + logistic regression in a pipeline, fit separately for each test season on all prior seasons only, predictions pooled and scored once against the market on identical games. 3,397 out-of-sample games, 2010–2025.
@@ -24,7 +67,7 @@ Three things this file is careful about, because each silently inflates results:
 - **All seven coefficient signs are correct.** `epa_edge_off` +0.305 (strongest),
   `home_off_epa_r5` +0.217 vs `away_off_epa_r5` −0.212 (near-symmetric, as they
   should be), `home_def_epa_r5` −0.142 (allowing more EPA lowers win probability —
-  the inverted sign I flagged in Phase 3, confirmed correct), `epa_edge_def` +0.138,
+  the inverted sign I flagged, confirmed correct), `epa_edge_def` +0.138,
   `rest_edge` +0.062, `away_def_epa_r5` +0.050. This is the main argument for
   starting linear: a backwards feature would have been visible immediately.
 - **The model is overconfident in the middle of its range.** Gaps of −0.02 to −0.04
@@ -56,7 +99,7 @@ Three things this file is careful about, because each silently inflates results:
 (window length, min periods, season reset, playoff inclusion) and probability
 calibration, judged on pooled log loss. The playoff-inclusion question from 2026-08-21 needs this noise floor to be answerable at all — a 0.07 per-season spread means the effect of a few games in a rolling window is invisible except in the pooled figure.
 
-## 2026-08-23 — backfill to 2002
+## 2026-08-23: backfill to 2002
 
 **Did:** Extended `build_team_games.py` from 3 seasons to 24 (2002–2025) and
 re-ran the feature build.
@@ -100,7 +143,7 @@ The only thing that matters in this file is `.shift(1)`. A rolling mean over a t
   runs 36.6% / 48.5% / 57.5% / 61.2% / 76.9%. Monotonic across all five.
   **This is in-sample and descriptive, not a result**. It says the features
   correlate with outcomes, not that a model generalizes. The honest number comes
-  from held-out seasons in Phase 4.
+  from held-out seasons.
 - **Warm-up costs 17.6% of games** (143 of 813). Resetting windows each season
   plus requiring 3 prior games means weeks 1–3 have no features for any team.
   This is the quantified price of the season-reset choice.

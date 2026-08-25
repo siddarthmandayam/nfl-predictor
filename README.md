@@ -36,29 +36,35 @@ ATS (against the spread) performance will be tracked separately. Break-even at s
 ## Results
 
 Walk-forward validation: for each test season, the model is fit only on seasons
-strictly before it. Predictions are pooled and scored once. **3,397 games,
+strictly before it. Predictions are pooled and scored once. **4,161 games,
 2010–2025, all out-of-sample.**
 
 | Model | Accuracy | Log loss | Brier | ECE |
 | :--- | :---: | :---: | :---: | :---: |
-| Market (de-vigged moneyline) | 67.62% | **0.6033** | 0.2081 | 0.0191 |
-| **Logistic regression on rolling EPA** | **63.03%** | **0.6405** | 0.2247 | 0.0301 |
-| Base rate (0.552) | 55.20% | 0.6879 | 0.2474 | 0.0088 |
+| Market (de-vigged moneyline) | 66.57% | **0.6094** | 0.2110 | 0.0165 |
+| **Logistic regression on rolling EPA** | **62.56%** | **0.6448** | 0.2268 | 0.0222 |
+| Base rate (0.554) | 55.42% | 0.6874 | 0.2471 | 0.0070 |
 
-The model reduces log loss 6.9% below the base rate; the market reduces it 12.3%.
-So rolling EPA alone captures roughly **56% of the market's edge** over knowing
-nothing.
+The model reduces log loss 6.2% below the base rate; the market reduces it 11.4%.
+Rolling EPA alone captures roughly **55% of the market's edge** over knowing nothing.
 
-**Where it is weak.** The model is overconfident in the middle of its range. Shows gaps of −0.02 to −0.04 across the 0.4–0.7 bins, giving ECE of 0.0301 against the market's 0.0191. When it says 65%, home teams win 62%. Probability calibration is the obvious next experiment.
+It does not beat the market, and it was not expected to. A first-pass model that
+appeared to would be evidence of leakage rather than skill.
 
-**Noise floor.** Per-season log loss ranges from 0.5957 (2012) to 0.6699 (2015) — a spread of 0.07, wider than the entire gap to the market. Any variant comparison
-must be judged on the pooled figure across all sixteen test seasons. Differences under ~0.01 on a single season are not meaningful.
+**Where it is weak.** The model is overconfident through the middle of its range —
+when it says 65%, home teams win 63%. ECE is 0.0222 against the market's 0.0165.
+Probability calibration is the next experiment.
+
+**Noise floor.** Per-season log loss ranges from 0.6178 (2011) to 0.6728 (2021), a
+spread of 0.055 — wider than the 0.035 gap to the market. Variant comparisons are
+therefore judged on the pooled figure across all sixteen test seasons, not on any
+single season.
 
 **Coefficients** (standardized) point the right way on all seven features:
-`epa_edge_off` +0.305 is strongest, `home_def_epa_r5` −0.142 correctly encodes
-that allowing more EPA lowers win probability, and `home_off_epa_r5` / 
-`away_off_epa_r5` are near-symmetric at +0.217 / −0.212. Sign checking is the main
-reason to start with a linear model.
+`epa_edge_off` +0.284 is strongest; `home_def_epa_r5` −0.146 correctly encodes that
+allowing more EPA lowers win probability; `home_off_epa_r5` +0.212 and
+`away_off_epa_r5` −0.185 are near-symmetric with opposite signs. Sign checking is
+the main reason to start with a linear model.
 
 ## Setup
 
@@ -119,7 +125,10 @@ Correctness is enforced by a conservation identity: league-wide mean `off_epa` m
 
 **Leakage guard.** A rolling mean includes the current game unless it is shifted. `features.py` shifts by one game before rolling, and `test_no_leakage()` proves it: for a chosen team and mid-season week, it recomputes the feature by hand from strictly earlier games and asserts a match, then asserts the value is *inconsistent* with a window that includes the current game. For example, Baltimore's Week 10 2024 feature is built from weeks 5–9.
 
-Rolling windows reset at each season boundary because rosters and schemes turn over heavily in the offseason. This costs 18.7% of games to warm-up (1,158 of 6,208, the first three weeks of every season) and is one of the variants to be tested later.
+Rolling windows carry across season boundaries. This was tested against resetting
+each season: no measurable difference in prediction quality, but carrying over
+recovers 1,108 games (warm-up drops from 18.7% to 0.8%), improves calibration, and
+makes Week 1 predictable at all. See DECISIONS.md.
 
 ## Validation
 

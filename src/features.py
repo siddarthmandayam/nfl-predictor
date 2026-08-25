@@ -10,9 +10,9 @@ OUT = Path("data/processed/features.parquet")
 WINDOW = 5          # rolling window length, in games
 MIN_PERIODS = 3     # games required before a feature is produced
 
-# Windows reset at each season start. Rosters, coaches and schemes turn over
-# heavily in the offseason, so last January's form is weak evidence about September.
-RESET_EACH_SEASON = True
+# Windows carry across seasons. Resetting was tested and made no measurable
+# difference, but cost 1,108 games and made Week 1 unpredictable.
+RESET_EACH_SEASON = False
 
 STATS = ["off_epa", "def_epa", "off_success", "def_success"]
 
@@ -130,8 +130,9 @@ def main() -> None:
 
     print(f"\n{'='*58}\nFEATURES\n{'='*58}")
     print(f"games with features : {len(feat):,}")
+    scope = "each season" if RESET_EACH_SEASON else "each team's history"
     print(f"dropped (warm-up)   : {dropped:,} "
-          f"({100*dropped/before:.1f}% -- first {MIN_PERIODS} games of each season)")
+      f"({100*dropped/before:.1f}% -- first {MIN_PERIODS} games of {scope})")
     print(f"seasons             : {feat.season.min()}-{feat.season.max()}")
     print(f"window              : {WINDOW} games, min {MIN_PERIODS}, "
           f"reset each season: {RESET_EACH_SEASON}")
