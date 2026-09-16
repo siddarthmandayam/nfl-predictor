@@ -5,6 +5,12 @@ season, evaluated against real baselines and logged live before kickoff each wee
 Trained on the 2002–2025 regular seasons. Live predictions begin Week 1 of the
 2026 season.
 
+## Live record (2026 season)
+
+| Week | Record | Accuracy | Log loss |
+|---|---|---|---|
+| Week 1 | 11–5 | 68.8% | 0.6331 |
+
 ## Status
 
 **Complete and live.** All five phases built and validated. Predictions are logged
