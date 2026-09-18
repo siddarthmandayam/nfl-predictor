@@ -5,7 +5,7 @@ import pandas as pd
 URL = ("https://github.com/nflverse/nflverse-data/releases/download/pbp/"
        "play_by_play_{season}.parquet")
 
-SEASONS = list(range(2002, 2026))
+SEASONS = list(range(2002, 2027))
 
 RAW = Path("data/raw")
 OUT = Path("data/processed/team_games.parquet")
