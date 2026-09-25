@@ -10,6 +10,7 @@ Trained on the 2002–2025 regular seasons. Live predictions begin Week 1 of the
 | Week | Record | Accuracy | Log loss |
 |---|---|---|---|
 | Week 1 | 11–5 | 68.8% | 0.6331 |
+| Week 2 | 9–7 | 56.2% | 0.7059 |
 
 ## Status
 

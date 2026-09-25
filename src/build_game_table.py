@@ -20,7 +20,7 @@ import sys
 import pandas as pd
 
 # nflverse maintains this file and updates through the season
-SCHEDULE_URL = "https://github.com/nflverse/nfldata/raw/master/data/games.csv"
+SCHEDULE_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 
 # 2002 is the first season with the current 32-team / 8-division alignment,
 # which keeps scheduling structure consistent
